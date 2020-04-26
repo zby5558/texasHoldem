@@ -3,7 +3,7 @@
 """
 Created on Sat Apr 18 15:44:28 2020
 
-@author: boyang
+@author: boyang 
 """
 import threading
 import socket   
@@ -15,7 +15,8 @@ ml = []
 roomID = '1'
 ID = random.randint(1,10000) #since we do not have enough machine, each machine can be used as several clients. Thus ID is used to distingush different players in one machine(haven't be implemented yet)
 def handle(ml, ipServer): # not used
-    while True:         
+    while True:
+        # ml definition: list for saving incoming messages      
         if len(ml)>0:            
             s = ml.pop()
             info = s.split(' ')
@@ -43,6 +44,7 @@ def handle(ml, ipServer): # not used
 def listen(ip, port, ml): # listen the feedback from the server
     #print("Server is starting")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # ip: is the local ip address
     ip = '192.168.2.4'
     print(ip)
     sock.bind((ip, port))
