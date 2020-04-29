@@ -11,14 +11,74 @@ import random
 import netifaces as ni
 import time
 import sys
-ml = []
+
+import numpy as np
+
+class deck_cards:
+    deck = []
+    flaglist = []
+    def __init__(self):
+        deck = []
+        for suit in [' of SPADES',' of CLUBS',' of HEARTS',' of DIAMONDS']:    
+            for i in ['2','3','4','5','6','7','8','9','10','J','Q','K','A']:
+                self.deck.append(str(i)+suit)
+                self.flaglist.append(1)
+                # print(str(i)+suit)
+        
+        
+    def print_cards(self):
+        for i in range(len(self.deck)):
+            if self.flaglist[i]==1:
+                print(self.deck[i])
+    
+
+class player:
+    def __init__(self, pid, personal_hand, starting_balance, is_creator):
+        self.pid = pid
+        self.is_creator = is_creator
+        self.personal_hand = personal_hand
+        self.starting_balance = starting_balance
+        self.current_balance_server = starting_balance
+        self.myturn = False
+        self.winner = False
+        self.folded = False
+
+    
+class pokerTable:
+    def __init__(self, first_player):
+        self.deck = deck_cards()
+        self.bet_round = 0
+        self.game_started = False # aka bet_round is zero
+        self.pot = 0
+        self.public_cards = ['X','X','X','X','X']
+        self.player_list = []
+
+        self.first_player = first_player
+        
+        
+    def add_player(self, new_player):
+        if not self.game_started:
+            self.player_list.append(new_player)
+        
+        
+    def print_status(self):
+        print("------------------------------")
+        print("Betting round: " + str(self.bet_round))
+        print("Current pot: $"+str(self.pot))
+        print("Public hand: "+str(self.public_cards))
+        print("Players: ")
+        print([player.pid for player in self.player_list])
+        print("Player accounts:")
+        print([player.current_balance_server for player in self.player_list])
+
+incoming_buffer = []
 roomID = '1'
 ID = random.randint(1,10000) #since we do not have enough machine, each machine can be used as several clients. Thus ID is used to distingush different players in one machine(haven't be implemented yet)
-def handle(ml, ipServer): # not used
+def handle(incoming_buffer, ipServer): # not used
     while True:
-        # ml definition: list for saving incoming messages      
-        if len(ml)>0:            
-            s = ml.pop()
+        # incoming_buffer definition: list for saving incoming messages      
+        if len(incoming_buffer)>0:            
+            s = incoming_buffer.pop()
             info = s.split(' ')
             selfID = info[len(info)-2]
             ip = info[len(info)-1]
@@ -41,7 +101,7 @@ def handle(ml, ipServer): # not used
             
                 
             
-def listen(ip, port, ml): # listen the feedback from the server
+def listen(ip, port, incoming_buffer): # listen the feedback from the server and appends to incoming_buffer
     #print("Server is starting")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # ip: is the local ip address
@@ -58,7 +118,7 @@ def listen(ip, port, ml): # listen the feedback from the server
             buf = connection.recv(1024)
             s = buf.decode("utf-8")
             sfull = s+" "+address[0]
-            ml.append(sfull)
+            incoming_buffer.append(sfull)
             print(s)
         except socket.timeout:
             print('time out')
@@ -67,36 +127,42 @@ def send(ip,port,mess):  #send function is used to send message to the taxasSeve
     sock.connect((ip, port))
     byt = mess.encode()
     sock.send(byt)
-def createGame(ip,port,name,ID, chip):
-    mess = "create "+name+" "+str(ID)+" "+str(chip)
+def createGame(ip,port,name,ID, chip_amount):
+    mess = "create "+name+" "+str(ID)+" "+str(chip_amount)
     send(ip, port, mess)
-def joinGame(ip,port,name,ID, chip, roomID):
-    mess = "join "+name+" "+str(ID)+" "+chip+" "+str(roomID)
+def joinGame(ip,port,name,ID, chip_amount, roomID):
+    mess = "join "+name+" "+str(ID)+" "+chip_amount+" "+str(roomID)
     send(ip, port, mess)
-def startGame(ip,port,name,ID, chip, roomID):
-    mess = "start "+name+" "+str(ID)+" "+chip+" "+str(roomID)
+def startGame(ip,port,name,ID, chip_amount, roomID):
+    mess = "start "+name+" "+str(ID)+" "+chip_amount+" "+str(roomID)
     send(ip, port, mess)
+
+
+
+#code starts to run
 #name = input("Enter your name : ") #input yout own name
 name = 'boyang'
-port = 8001
 print("Your name is "+name)
       
-#chip = input("Enter your chip : ") # input your chip which is used to bet
-chip = '100'
-print("your chip is "+chip)
+#chip_amount = input("Enter your chip_amount : ") # input your chip_amount which is used to bet
+chip_amount = '100'
+print("your chip_amount is "+chip_amount)
 #ipServer = input("ip address of the texasSever : ") # ipAddress of the server, the client can only send message to the server and receive the message from the server
 ipServer = '192.168.2.5'
-print("your ip sever is "+ipServer)
+print("your server IP address is "+ipServer)
+# ip is a placeholder
 ip = '127.0.0.1'
-t1 = threading.Thread(target=listen,args=(ip, port, ml))#create one thread keep listening from the server, all the information receiverd is added to list ml
+port = 8001
+t1 = threading.Thread(target=listen,args=(ip, port, incoming_buffer))#create one thread keep listening from the server, all the information receiverd is added to list incoming_buffer - only deal with one message at a time
 t1.start()
 
 cg = input("do you want you create game? please use y or n : ") #whether you want to create a room for game or not
 if cg == 'y':
-    createGame(ipServer,port, name,ID,chip) #send create request to the server
+    createGame(ipServer,port, name,ID,chip_amount) #send create request to the server
+    # what is this while true for? 
     while True:   
-        if len(ml)>0:            
-            s = ml.pop()
+        if len(incoming_buffer)>0:            
+            s = incoming_buffer.pop()
             info = s.split(' ')
             selfID = info[len(info)-2]
             ip = info[len(info)-1]
@@ -105,14 +171,16 @@ if cg == 'y':
                     roomID = info[1]
                     print("create successfully and the room ID is "+roomID)#create successfully and get the roomID, this client is the owner of the game
                     break
+                else:
+                    # something is wrong if you get to this else statement
     print("room id : "+roomID)
     sg = input("do you want to start the game? use y or n : ")
     if sg == "y":
-        startGame(ipServer,port,name,ID,chip, roomID) #send start request to the server
+        startGame(ipServer,port,name,ID,chip_amount, roomID) #send start request to the server
         while True:  
             time.sleep(0.05)
-            if len(ml)>0:            
-                s = ml.pop()
+            if len(incoming_buffer)>0:            
+                s = incoming_buffer.pop()
                 info = s.split(' ')
                 selfID = info[len(info)-2]
                 ip = info[len(info)-1]
@@ -121,9 +189,9 @@ if cg == 'y':
                         print("start successfully and the room ID is "+roomID)
                         while True:
                             time.sleep(0.05)
-                            if len(ml) == 0:
+                            if len(incoming_buffer) == 0:
                                 continue
-                            s = ml.pop()
+                            s = incoming_buffer.pop()
                             info = s.split(' ')
                             selfID = info[len(info)-2]
                             ip = info[len(info)-1]
@@ -131,17 +199,17 @@ if cg == 'y':
                                 if(s.startswith('over')):
                                     print('gameOver')
                                     sys.exit()
-                                if(s.startswith('name') or s.startswith('chip') or s.startswith('card')):
+                                if(s.startswith('name') or s.startswith('chip_amount') or s.startswith('card')):
                                     print(info[0])
                                 if(s.startswith('You-are')):
                                     
                                     print("your card in hand: " + info[len(info)-4])
                                     bet = input("do you want to start the bet? y or n: ") # means you are the fisrt one to bet
                                     if(bet == 'y'):
-                                        amount = input("how much do you want to bet?")# how many chips do you want to bet
-                                        print("you have "+info[len(info)-3]+" chip")
+                                        amount = input("how much do you want to bet?")# how many chip_amounts do you want to bet
+                                        print("you have "+info[len(info)-3]+" chip_amount")
                                         print("your card in hand is "+info[len(info)-4])
-                                        while(int(amount)>int(info[len(info)-3]) or int(amount) == 0):# you bet amount should be less than the chips you have
+                                        while(int(amount)>int(info[len(info)-3]) or int(amount) == 0):# you bet amount should be less than the chip_amounts you have
                                             amount = input("you do not have enough money or you input no money, reinput it: ")
                                         mess = "bet-start "+amount+" "+roomID+" "+name
                                         send(ipServer,port, mess)
@@ -150,11 +218,11 @@ if cg == 'y':
                                         send(ipServer,port, mess)
                                 if(s.startswith('the-bet')):#Previously, there is someone bet, do you want to follow him
                                     print("do you want to follow the bet? the bet amount is "+info[len(info)-3])
-                                    print("you have "+info[len(info)-4]+" chip")
+                                    print("you have "+info[len(info)-4]+" chip_amount")
                                     print("your card in hand is "+info[len(info)-5 ])
                                     bet = input(" y or n: ")
                                     if(bet == 'y'):
-                                        if(info[len(info)-3] > info[len(info)-4]):# if you do not have enough chips, and you choose yes, just show hand 
+                                        if(info[len(info)-3] > info[len(info)-4]):# if you do not have enough chip_amounts, and you choose yes, just show hand 
                                             amount = int(info[len(info)-4])
                                         else:
                                             amount = int(info[len(info)-3])
@@ -175,10 +243,11 @@ else:
     jg = input("do you want you join game? please use y or n : ") # whether to join a game whose owner is anothet client
     if jg == 'y':
         roomID = input("roomID is : ")                  #if you want to join the name, you need to know the roomID from the gameOwner
-        joinGame(ipServer,port,name,ID, chip, roomID)  
+        joinGame(ipServer,port,name,ID, chip_amount, roomID)  
         while True:   
-            if len(ml)>0:            
-                s = ml.pop()
+            if len(incoming_buffer)>0:            
+                s = incoming_buffer.pop()
+                # Isaac: the thing that is being split is the incoming message.
                 info = s.split(' ')
                 selfID = info[len(info)-2]
                 ip = info[len(info)-1]
@@ -188,4 +257,3 @@ else:
                         print("join successfully and the room ID is "+roomID)
 #t3 = threading.Thread(target=start,)
 #t3.start()
-

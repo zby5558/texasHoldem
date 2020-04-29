@@ -10,6 +10,66 @@ import socket
 import random  
 import time
 import netifaces as ni
+
+import numpy as np
+
+class deck_cards:
+    deck = []
+    flaglist = []
+    def __init__(self):
+        deck = []
+        for suit in [' of SPADES',' of CLUBS',' of HEARTS',' of DIAMONDS']:    
+            for i in ['2','3','4','5','6','7','8','9','10','J','Q','K','A']:
+                self.deck.append(str(i)+suit)
+                self.flaglist.append(1)
+                # print(str(i)+suit)
+        
+        
+    def print_cards(self):
+        for i in range(len(self.deck)):
+            if self.flaglist[i]==1:
+                print(self.deck[i])
+    
+
+class player:
+    def __init__(self, pid, personal_hand, starting_balance, is_creator):
+        self.pid = pid
+        self.is_creator = is_creator
+        self.personal_hand = personal_hand
+        self.starting_balance = starting_balance
+        self.current_balance_server = starting_balance
+        self.myturn = False
+        self.winner = False
+        self.folded = False
+
+    
+class pokerTable:
+    def __init__(self, first_player):
+        self.deck = deck_cards()
+        self.bet_round = 0
+        self.game_started = False # aka bet_round is zero
+        self.pot = 0
+        self.public_cards = ['X','X','X','X','X']
+        self.player_list = []
+
+        self.first_player = first_player
+        
+        
+    def add_player(self, new_player):
+        if not self.game_started:
+            self.player_list.append(new_player)
+        
+        
+    def print_status(self):
+        print("------------------------------")
+        print("Betting round: " + str(self.bet_round))
+        print("Current pot: $"+str(self.pot))
+        print("Public hand: "+str(self.public_cards))
+        print("Players: ")
+        print([player.pid for player in self.player_list])
+        print("Player accounts:")
+        print([player.current_balance_server for player in self.player_list])
+
 ml = []
 port = 8001
 roomID = 0      # the roomID of the game
@@ -96,6 +156,7 @@ def updateInfo(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):
         send(ip,port,mess)
         send(ip,port,mess1)
         send(ip,port,mess2)
+
 def bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):# check whether each gamer bet or not
     print("start bet")
     numPlayers = 0 # how many players bet
@@ -149,6 +210,10 @@ def bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):# check
             send(ip,port,mess)
     return numPlayers,lastPlayer
 
+def print_pokerstable_state_to_user(mess):
+    if mess[0] == 'the-bet-amount-is '
+[ , , , , , , ]
+[]
             
         
 def gameStart(rID,gamerID, gamerChip , gameOwner, gamerIP, gamerName, fiveCards, cardInhand,cardLeft):
@@ -324,6 +389,7 @@ def listen(ip, port, ml):
             buf = connection.recv(1024)
             s = buf.decode("utf-8")
             sfull = s+" "+address[0]
+            # ml on the server side is a globally shared list of tcp connections
             ml.append(sfull)
             print("sfull is "+sfull)
         except socket.timeout:
