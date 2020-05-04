@@ -14,6 +14,9 @@ import sys
 
 import numpy as np
 
+import numpy as np
+import random
+
 class deck_cards:
     deck = []
     flaglist = []
@@ -41,35 +44,50 @@ class player:
         self.current_balance_server = starting_balance
         self.myturn = False
         self.winner = False
-        self.folded = False
-
+        self.status = "Active" # might otherwise be folded
+        
+    def __str__(self):
+        return str(self.pid)+"("+self.status+", has $"+str(self.current_balance_server)+")"
     
 class pokerTable:
-    def __init__(self, first_player):
+    def __init__(self, first_player,game_id):
+        self.game_id = game_id
         self.deck = deck_cards()
         self.bet_round = 0
         self.game_started = False # aka bet_round is zero
         self.pot = 0
         self.public_cards = ['X','X','X','X','X']
         self.player_list = []
-
+        self.curr_player_idx = 0
         self.first_player = first_player
         
         
-    def add_player(self, new_player):
+    def add_player(self, new_player, game_id):
         if not self.game_started:
             self.player_list.append(new_player)
         
+    def whos_turn(self):
+        return self.curr_player_idx
         
-    def print_status(self):
-        print("------------------------------")
-        print("Betting round: " + str(self.bet_round))
-        print("Current pot: $"+str(self.pot))
-        print("Public hand: "+str(self.public_cards))
-        print("Players: ")
-        print([player.pid for player in self.player_list])
-        print("Player accounts:")
-        print([player.current_balance_server for player in self.player_list])
+    # def print_status(self):
+    #     print("------------------------------\n")
+    #     print("Betting round: " + str(self.bet_round))
+    #     print("Current pot: $"+str(self.pot))
+    #     print("Public hand: "+str(self.public_cards))
+    #     print("Players (in betting order): ")
+    #     print([player.pid for player in self.player_list])
+    #     print("Player accounts:")
+    #     print([player.current_balance_server for player in self.player_list])
+    #     print(self.player_list.__getitem__(self.curr_player_idx))
+        
+    def __str__(self):
+        return "------------------------------------------------------------------"+\
+            "\nGame id: "+str(self.game_id)+", Pot size: $"+str(self.pot)+", Betting round: "+str(self.bet_round)+ \
+            "\nPlayers (betting order):"+\
+            "\n"+" // ".join(str(x) for x in self.player_list)+\
+            "\nCards: ["+" ".join(str(x) for x in self.public_cards)+"]"\
+            "\nPot: $"+str(self.pot)+\
+            "\n"+str(self.player_list[self.curr_player_idx])+'\'s turn to bet...'
 
 incoming_buffer = []
 roomID = '1'
@@ -110,9 +128,10 @@ def listen(ip, port, incoming_buffer): # listen the feedback from the server and
     sock.bind((ip, port))
     sock.listen(5)
     #print("Server is listenting port 8001, with max connection 5")
+    # Isaac moved the next two lines out of the while loop
+    time.sleep(0.05)
+    connection, address = sock.accept()
     while True:
-        time.sleep(0.05)
-        connection, address = sock.accept()
         try:
             connection.settimeout(10000)
             buf = connection.recv(1024)
@@ -156,8 +175,8 @@ port = 8001
 t1 = threading.Thread(target=listen,args=(ip, port, incoming_buffer))#create one thread keep listening from the server, all the information receiverd is added to list incoming_buffer - only deal with one message at a time
 t1.start()
 
-cg = input("do you want you create game? please use y or n : ") #whether you want to create a room for game or not
-if cg == 'y':
+create_game_yn = input("do you want you create game? please use y or n : ") #whether you want to create a room for game or not
+if create_game_yn == 'y':
     createGame(ipServer,port, name,ID,chip_amount) #send create request to the server
     # what is this while true for? 
     while True:   
@@ -174,8 +193,8 @@ if cg == 'y':
                 else:
                     # something is wrong if you get to this else statement
     print("room id : "+roomID)
-    sg = input("do you want to start the game? use y or n : ")
-    if sg == "y":
+    start_game_yn = input("do you want to start the game? use y or n : ")
+    if start_game_yn == "y":
         startGame(ipServer,port,name,ID,chip_amount, roomID) #send start request to the server
         while True:  
             time.sleep(0.05)
@@ -240,8 +259,8 @@ if cg == 'y':
                         
     
 else:
-    jg = input("do you want you join game? please use y or n : ") # whether to join a game whose owner is anothet client
-    if jg == 'y':
+    joing_game_yn = input("do you want you join game? please use y or n : ") # whether to join a game whose owner is anothet client
+    if joing_game_yn == 'y':
         roomID = input("roomID is : ")                  #if you want to join the name, you need to know the roomID from the gameOwner
         joinGame(ipServer,port,name,ID, chip_amount, roomID)  
         while True:   

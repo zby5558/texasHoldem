@@ -13,6 +13,9 @@ import netifaces as ni
 
 import numpy as np
 
+import numpy as np
+import random
+
 class deck_cards:
     deck = []
     flaglist = []
@@ -40,38 +43,53 @@ class player:
         self.current_balance_server = starting_balance
         self.myturn = False
         self.winner = False
-        self.folded = False
-
+        self.status = "Active" # might otherwise be folded
+        
+    def __str__(self):
+        return str(self.pid)+"("+self.status+", has $"+str(self.current_balance_server)+")"
     
 class pokerTable:
-    def __init__(self, first_player):
+    def __init__(self, first_player,game_id):
+        self.game_id = game_id
         self.deck = deck_cards()
         self.bet_round = 0
         self.game_started = False # aka bet_round is zero
         self.pot = 0
         self.public_cards = ['X','X','X','X','X']
         self.player_list = []
-
+        self.curr_player_idx = 0
         self.first_player = first_player
         
         
-    def add_player(self, new_player):
+    def add_player(self, new_player, game_id):
         if not self.game_started:
             self.player_list.append(new_player)
         
+    def whos_turn(self):
+        return self.curr_player_idx
         
-    def print_status(self):
-        print("------------------------------")
-        print("Betting round: " + str(self.bet_round))
-        print("Current pot: $"+str(self.pot))
-        print("Public hand: "+str(self.public_cards))
-        print("Players: ")
-        print([player.pid for player in self.player_list])
-        print("Player accounts:")
-        print([player.current_balance_server for player in self.player_list])
+    # def print_status(self):
+    #     print("------------------------------\n")
+    #     print("Betting round: " + str(self.bet_round))
+    #     print("Current pot: $"+str(self.pot))
+    #     print("Public hand: "+str(self.public_cards))
+    #     print("Players (in betting order): ")
+    #     print([player.pid for player in self.player_list])
+    #     print("Player accounts:")
+    #     print([player.current_balance_server for player in self.player_list])
+    #     print(self.player_list.__getitem__(self.curr_player_idx))
+        
+    def __str__(self):
+        return "------------------------------------------------------------------"+\
+            "\nGame id: "+str(self.game_id)+", Pot size: $"+str(self.pot)+", Betting round: "+str(self.bet_round)+ \
+            "\nPlayers (betting order):"+\
+            "\n"+" // ".join(str(x) for x in self.player_list)+\
+            "\nCards: ["+" ".join(str(x) for x in self.public_cards)+"]"\
+            "\nPot: $"+str(self.pot)+\
+            "\n"+str(self.player_list[self.curr_player_idx])+'\'s turn to bet...'
 
-ml = []
-port = 8001
+
+
 roomID = 0      # the roomID of the game
 gamerName = []  #the name of each gamer in the game
 gamerID = []    #ID of each gamer in the game
@@ -285,11 +303,12 @@ def gameStart(rID,gamerID, gamerChip , gameOwner, gamerIP, gamerName, fiveCards,
         broadcast(rID,gamerID,gamerIP,s)
         gamerChip[rID][lastPlayer] = gamerChip[rID][lastPlayer]+chipAmount[rID]
     
-def handle(ml, roomID, gamerID, gamerChip , gameOwner, gamerIP, gamerName, cardLeft):# cope with the message listened
+def handle(incoming_buffer, roomID, gamerID, gamerChip , gameOwner, gamerIP, gamerName, cardLeft):# cope with the message listened
     while True:
         time.sleep(0.05)
-        if len(ml)>0:            
-            s = ml.pop()
+        # okay so each client is interacting with the same port/address/socket
+        if len(incoming_buffer)>0:            
+            s = incoming_buffer.pop()
             if(s.startswith("create")):              # means someone want to create a room for game
                 name,ID,chip,ip = getcreate(s)
                 if(roomID == 100):
@@ -375,7 +394,7 @@ def handle(ml, roomID, gamerID, gamerChip , gameOwner, gamerIP, gamerName, cardL
                 s = "Player "+info[2]+" doesn't bet"
                 broadcast(rID, gamerID,gamerIP,s)# broadcast whether he bet or not to all players
                 
-def listen(ip, port, ml):
+def listen(ip, port, incoming_buffer):
     #print("Server is starting")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     ip = ni.ifaddresses('wlp68s0')[ni.AF_INET][0]['addr']
@@ -389,13 +408,16 @@ def listen(ip, port, ml):
             buf = connection.recv(1024)
             s = buf.decode("utf-8")
             sfull = s+" "+address[0]
-            # ml on the server side is a globally shared list of tcp connections
-            ml.append(sfull)
+            # incoming_buffer on the server side is a globally shared list of tcp connections
+            incoming_buffer.append(sfull)
             print("sfull is "+sfull)
         except socket.timeout:
             print('time out')
+
 ip = 'localhost'
-t1 = threading.Thread(target=listen,args=(ip, port, ml))
+port = 8001
+incoming_buffer = []
+t1 = threading.Thread(target=listen,args=(ip, port, incoming_buffer))
 t1.start()
-t2 = threading.Thread(target=handle,args=(ml, roomID, gamerID, gamerChip , gameOwner, gamerIP, gamerName, cardLeft))
+t2 = threading.Thread(target=handle,args=(incoming_buffer, roomID, gamerID, gamerChip , gameOwner, gamerIP, gamerName, cardLeft))
 t2.start()
