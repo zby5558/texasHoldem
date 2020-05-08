@@ -129,9 +129,9 @@ for i in range(0,100):      # in this program, there are more than one game that
     start.append(0)
 def send(ip,port,mess): #send message to the clients
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
-    sock.connect((ip, port))    
+    sock.connect((ip, port))
     byt = mess.encode()
-    sock.send(byt)
+    sock.send(byt) 
 def getcreate(s): 
     info = s.split(" ")
     name = info[1]
@@ -153,7 +153,7 @@ def broadcast(rID,gamerID,gamerIP,s): #broadcast the message to all the clients 
             continue
         ID = gamerID[rID][i]
         ip = gamerIP[rID][i]
-        mess = s+" "+str(roomID)+" "+ID
+        mess = s+" "+str(rID)+" "+ID
         send(ip,port,mess)
 def updateInfo(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):# broadcast the name, chip owned by each gamer and the first two cards of each gamer. And the gamer will also get the cards he has which are not shown to others
     namestr = 'name'
@@ -168,9 +168,11 @@ def updateInfo(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):
             continue
         ID = gamerID[rID][i]
         ip = gamerIP[rID][i]
+        
         mess = namestr+' '+str(rID)+" "+ID
         mess1 = chipstr+' '+str(rID)+" "+ID
         mess2 = cardstr+' '+str(rID)+' '+ID
+        print("ip "+ip)
         send(ip,port,mess)
         send(ip,port,mess1)
         send(ip,port,mess2)
@@ -187,28 +189,22 @@ def bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):# check
         while(i != 0 and gamerReply[rID][i-1] == 0):  # if a player has already replied, gamerReplay[rID][i] should be one. this part is to wait until your previous player replies
             time.sleep(1)
         if(gamerID[rID][i].startswith('virtual')):  # if it is a virtual player, just randonly select bet or not
-            numPlayers = numPlayers+1
+            
             lastPlayer = i
             gamerReply[rID][i] = 1
             if(betStart[rID] == 0):
-                if(random.random()>0.5):
-                    betStart[rID] = 1;
-                    amount = random.randint(1,gamerChip[rID][i])
-                    chipAmount[rID] = chipAmount[rID]+amount
-                    gamerChip[rID][i] = gamerChip[rID][i]-amount
-                    currentChip[rID] = amount                   
-                else:
-                    gamerLeft[rID][i] = 1
+                betStart[rID] = 1;
+                amount = random.randint(1,gamerChip[rID][i]/2)
+                chipAmount[rID] = chipAmount[rID]+amount
+                gamerChip[rID][i] = gamerChip[rID][i]-amount
+                currentChip[rID] = amount                   
             else:
-                if(random.random()>0.5):
-                    if(currentChip[rID] > gamerChip[rID][i]):
-                        chipAmount[rID] = chipAmount[rID]+gamerChip[rID][i]
-                        gamerChip[rID][i] = 0
-                    else:
-                        chipAmount[rID] = chipAmount[rID]+currentChip[rID]
-                        gamerChip[rID][i] = gamerChip[rID][i]-currentChip[rID]
+                if(currentChip[rID] > gamerChip[rID][i]):
+                    chipAmount[rID] = chipAmount[rID]+gamerChip[rID][i]
+                    gamerChip[rID][i] = 0
                 else:
-                    gamerLeft[rID][i] = 1
+                    chipAmount[rID] = chipAmount[rID]+currentChip[rID]
+                    gamerChip[rID][i] = gamerChip[rID][i]-currentChip[rID]
             continue
                     
         
@@ -216,8 +212,7 @@ def bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):# check
             ID = gamerID[rID][i]
             ip = gamerIP[rID][i]
             numPlayers = numPlayers+1
-            lastPlayer = i
-            mess = 'You-are-the-first-one-to-bet '+str(rID)+' '+''+str(','.join(cardInhand[rID][i]))+" "+str(gamerChip[rID][i])+' '+ID            
+            mess = 'first '+str(rID)+' '+''+str(','.join(cardInhand[rID][i]))+" "+str(gamerChip[rID][i])+' '+ID      
             send(ip,port,mess)
         else:                 # this player is not the first one to bet, he or she should follow previous players
             ID = gamerID[rID][i]
@@ -226,12 +221,16 @@ def bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft):# check
             lastPlayer = i
             mess = 'the-bet-amount-is '+str(rID)+' '+''+str(','.join(cardInhand[rID][i]))+" "+str(gamerChip[rID][i])+' '+str(currentChip[rID])+' '+ID            
             send(ip,port,mess)
+            for i in range(len(gamerName[rID])):
+                if(gamerLeft[rID][i] == 0):
+                    numPlayers = numPlayers+1
+                    lastPlayer = i
     return numPlayers,lastPlayer
 
-def print_pokerstable_state_to_user(mess):
+'''def print_pokerstable_state_to_user(mess):
     if mess[0] == 'the-bet-amount-is '
 [ , , , , , , ]
-[]
+[]'''
             
         
 def gameStart(rID,gamerID, gamerChip , gameOwner, gamerIP, gamerName, fiveCards, cardInhand,cardLeft):
@@ -249,12 +248,6 @@ def gameStart(rID,gamerID, gamerChip , gameOwner, gamerIP, gamerName, fiveCards,
             
         random.shuffle(cardLeft[rID]) # shuffle the card deck
         cardstr = ''
-        for i in range(0,3):
-            card = cardLeft[rID].pop()
-            fiveCards[rID].append(card)
-            cardstr = cardstr+card+','
-        s = "three cards are: "+cardstr
-        broadcast(rID,gamerID,gamerIP,s) # broadcast the three public cards
         for i in range(0,len(gamerName[rID])):
             if(len(gamerLeft[rID])<(i+1)):
                 gamerLeft[rID].append(0)
@@ -270,17 +263,38 @@ def gameStart(rID,gamerID, gamerChip , gameOwner, gamerIP, gamerName, fiveCards,
                 cardInhand[rID][i].clear()
             cardInhand[rID][i].append(cardLeft[rID].pop())
             cardInhand[rID][i].append(cardLeft[rID].pop())  # each player draws two cards from the deck
-        updateInfo(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft) # broadcast the information to all clients
-        
+        #
+        finish = 0
         numPlayers,lastPlayer = bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft)
         if(numPlayers <= 1): # if there is only one player bet, game is over and we have the winner
+            print('numPlayers ',numPlayers)
+            s = "Game end, winner is "+gamerName[rID][lastPlayer]
+            broadcast(rID,gamerID,gamerIP,s)
+            gamerChip[rID][lastPlayer] = gamerChip[rID][lastPlayer]+chipAmount[rID]
+            continue
+        
+        for i in range(0,3):
+            card = cardLeft[rID].pop()
+            fiveCards[rID].append(card)
+            cardstr = cardstr+card+','
+        s = "3 cards are: "+cardstr
+        broadcast(rID,gamerID,gamerIP,s) # broadcast the three public cards     
+        betStart[rID] = 0 # initial betStart[rID] to 0 for the next turn of bet
+        for i in range(0,len(gamerName[rID])):# initial the gamerReply for the next turn of bet 
+            if(len(gamerReply[rID])<(i+1)):
+                gamerReply[rID].append(0)
+            else:
+                gamerReply[rID][i] = 0
+        numPlayers,lastPlayer = bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft)
+        if(numPlayers <= 1): # if there is only one player bet, game is over and we have the winner
+            print('numPlayers ',numPlayers)
             s = "Game end, winner is "+gamerName[rID][lastPlayer]
             broadcast(rID,gamerID,gamerIP,s)
             gamerChip[rID][lastPlayer] = gamerChip[rID][lastPlayer]+chipAmount[rID]
             continue
         k = 0
-        finish = 0
-        while(k<3):# This part of code is to bet for the three more cards
+        
+        while(k<2):# This part of code is to bet for the three more cards
             k = k+1
             betStart[rID] = 0 # initial betStart[rID] to 0 for the next turn of bet
             for i in range(0,len(gamerName[rID])):# initial the gamerReply for the next turn of bet 
@@ -288,10 +302,14 @@ def gameStart(rID,gamerID, gamerChip , gameOwner, gamerIP, gamerName, fiveCards,
                     gamerReply[rID].append(0)
                 else:
                     gamerReply[rID][i] = 0
-                cardInhand[rID][i].append(cardLeft[rID].pop())#each player draw one card
-            updateInfo(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft)#broadcast the new infomation
+            card = cardLeft[rID].pop()
+            fiveCards[rID].append(card)
+            cardstr = cardstr+card+','
+            s = str(3+k)+" cards are: "+cardstr
+            broadcast(rID,gamerID,gamerIP,s)
             numPlayers,lastPlayer = bet(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft)# start the bet
             if(numPlayers <= 1): # if there is only one player bet, game is over and we have the winner
+                print('numPlayers ',numPlayers)
                 s = "Game end, winner is "+gamerName[rID][lastPlayer]
                 broadcast(rID,gamerID,gamerIP,s)
                 gamerChip[rID][lastPlayer] = gamerChip[rID][lastPlayer]+chipAmount[rID]
@@ -299,6 +317,7 @@ def gameStart(rID,gamerID, gamerChip , gameOwner, gamerIP, gamerName, fiveCards,
                 break
         if(finish): # if finish means there is only one player bet, game is over and we have the winner, so go to the next game
             continue
+        updateInfo(rID,gamerID, gamerChip, gamerIP, gamerName, cardInhand,cardLeft) # broadcast the information to all clients
         s = "Game end, winner is "+gamerName[rID][0] # if there are more than one person still in the game after drawing all five cards, just choose the first one win. Because I haven't implemneted the winning rule yet
         broadcast(rID,gamerID,gamerIP,s)
         gamerChip[rID][lastPlayer] = gamerChip[rID][lastPlayer]+chipAmount[rID]
@@ -386,7 +405,6 @@ def handle(incoming_buffer, roomID, gamerID, gamerChip , gameOwner, gamerIP, gam
                 broadcast(rID, gamerID,gamerIP,s) # broadcast whether he bet or not to all players
             if(s.startswith('n')): # means this player decide not to bet
                 info = s.split(' ')
-                info = s.split(' ')
                 rID = int(info[1])
                 index = gamerName[rID].index(info[2])
                 gamerReply[rID][index] = 1# set gamerReplay[rID][index] to 1 means that the next player can bet, because this player has already replied 
@@ -397,7 +415,7 @@ def handle(incoming_buffer, roomID, gamerID, gamerChip , gameOwner, gamerIP, gam
 def listen(ip, port, incoming_buffer):
     #print("Server is starting")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    ip = ni.ifaddresses('wlp68s0')[ni.AF_INET][0]['addr']
+    ip = '192.168.2.3'
     sock.bind((ip, port))
     sock.listen(5)
     #print("Server is listenting port 8001, with max connection 5")

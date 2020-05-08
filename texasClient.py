@@ -123,22 +123,22 @@ def listen(ip, port, incoming_buffer): # listen the feedback from the server and
     #print("Server is starting")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # ip: is the local ip address
-    ip = '192.168.2.4'
-    print(ip)
+    ip = '192.168.2.2'
     sock.bind((ip, port))
     sock.listen(5)
     #print("Server is listenting port 8001, with max connection 5")
     # Isaac moved the next two lines out of the while loop
-    time.sleep(0.05)
-    connection, address = sock.accept()
+    
     while True:
+        connection, address = sock.accept()
         try:
             connection.settimeout(10000)
             buf = connection.recv(1024)
             s = buf.decode("utf-8")
+            
             sfull = s+" "+address[0]
-            incoming_buffer.append(sfull)
             print(s)
+            incoming_buffer.append(sfull)
         except socket.timeout:
             print('time out')
 def send(ip,port,mess):  #send function is used to send message to the taxasSever
@@ -156,7 +156,58 @@ def startGame(ip,port,name,ID, chip_amount, roomID):
     mess = "start "+name+" "+str(ID)+" "+chip_amount+" "+str(roomID)
     send(ip, port, mess)
 
+def play(incoming_buffer):
+    while True:  
+            time.sleep(0.05)
+            if len(incoming_buffer)>0:            
+                s = incoming_buffer.pop()
+                info = s.split(' ')
+                selfID = info[len(info)-2]
+                ip = info[len(info)-1]
 
+                if(ip == ipServer and int(selfID) == ID):  #check whether the sender is the Server and send to our ID
+                    if(s.startswith('first')):                                
+                            print("your card in hand: " + info[len(info)-4])
+                            bet = input("do you want to start the bet? y or n: ") # means you are the fisrt one to bet
+                            if(bet == 'y'):
+                                amount = input("how much do you want to bet?")# how many chip_amounts do you want to bet
+                                print("you have "+info[len(info)-3]+" chip_amount")
+                                print("your card in hand is "+info[len(info)-4])
+                                while(int(amount)>int(info[len(info)-3]) or int(amount) == 0):# you bet amount should be less than the chip_amounts you have
+                                    amount = input("you do not have enough money or you input no money, reinput it: ")
+                                mess = "bet-start "+amount+" "+roomID+" "+name
+                                send(ipServer,port, mess)
+                            else:
+                                mess = 'n '+roomID+" "+name
+                                send(ipServer,port, mess)
+                                           
+                    if(s.startswith('over')):
+                        print('gameOver')
+                        sys.exit()
+                    if(s.startswith('name') or s.startswith('chip_amount') or s.startswith('card')):
+                        print(info[0])
+                    
+                    if(s.startswith('the-bet')):#Previously, there is someone bet, do you want to follow him
+                        print("do you want to follow the bet? the bet amount is "+info[len(info)-3])
+                        print("you have "+info[len(info)-4]+" chip_amount")
+                        print("your card in hand is "+info[len(info)-5 ])
+                        bet = input(" y or n: ")
+                        if(bet == 'y'):
+                            if(info[len(info)-3] > info[len(info)-4]):# if you do not have enough chip_amounts, and you choose yes, just show hand 
+                                amount = int(info[len(info)-4])
+                            else:
+                                amount = int(info[len(info)-3])
+                            mess = "bet-start "+str(amount)+" "+roomID+" "+name
+                            send(ipServer,port, mess)
+                    if(s.startswith('Game end') or s.startswith("Player") or s.startswith("3") or s.startswith("4") or s.startswith("5")):#this is to check whether this round of game is end, or does the player bet or not ,or who is the winner of the game
+                        '''info = s.split(' ')
+                        info = info[0:len(info)-2]
+                        print(" ".join(info))'''
+                        print(s)
+                                    
+                    elif(s.startswith("fail")):
+                        print("fail to start")
+                        sys.exit()
 
 #code starts to run
 #name = input("Enter your name : ") #input yout own name
@@ -167,7 +218,7 @@ print("Your name is "+name)
 chip_amount = '100'
 print("your chip_amount is "+chip_amount)
 #ipServer = input("ip address of the texasSever : ") # ipAddress of the server, the client can only send message to the server and receive the message from the server
-ipServer = '192.168.2.5'
+ipServer = '192.168.2.3'
 print("your server IP address is "+ipServer)
 # ip is a placeholder
 ip = '127.0.0.1'
@@ -191,71 +242,12 @@ if create_game_yn == 'y':
                     print("create successfully and the room ID is "+roomID)#create successfully and get the roomID, this client is the owner of the game
                     break
                 else:
-                    # something is wrong if you get to this else statement
-    print("room id : "+roomID)
+                    print('wrong')
+    
     start_game_yn = input("do you want to start the game? use y or n : ")
     if start_game_yn == "y":
         startGame(ipServer,port,name,ID,chip_amount, roomID) #send start request to the server
-        while True:  
-            time.sleep(0.05)
-            if len(incoming_buffer)>0:            
-                s = incoming_buffer.pop()
-                info = s.split(' ')
-                selfID = info[len(info)-2]
-                ip = info[len(info)-1]
-                if(ip == ipServer and int(selfID) == ID):
-                    if(s.startswith("start")):                   #if received start, means we sucessfully start the game
-                        print("start successfully and the room ID is "+roomID)
-                        while True:
-                            time.sleep(0.05)
-                            if len(incoming_buffer) == 0:
-                                continue
-                            s = incoming_buffer.pop()
-                            info = s.split(' ')
-                            selfID = info[len(info)-2]
-                            ip = info[len(info)-1]
-                            if(ip == ipServer and int(selfID) == ID):#check whether the sender is the Server and send to our ID
-                                if(s.startswith('over')):
-                                    print('gameOver')
-                                    sys.exit()
-                                if(s.startswith('name') or s.startswith('chip_amount') or s.startswith('card')):
-                                    print(info[0])
-                                if(s.startswith('You-are')):
-                                    
-                                    print("your card in hand: " + info[len(info)-4])
-                                    bet = input("do you want to start the bet? y or n: ") # means you are the fisrt one to bet
-                                    if(bet == 'y'):
-                                        amount = input("how much do you want to bet?")# how many chip_amounts do you want to bet
-                                        print("you have "+info[len(info)-3]+" chip_amount")
-                                        print("your card in hand is "+info[len(info)-4])
-                                        while(int(amount)>int(info[len(info)-3]) or int(amount) == 0):# you bet amount should be less than the chip_amounts you have
-                                            amount = input("you do not have enough money or you input no money, reinput it: ")
-                                        mess = "bet-start "+amount+" "+roomID+" "+name
-                                        send(ipServer,port, mess)
-                                    else:
-                                        mess = 'n '+roomID+" "+name
-                                        send(ipServer,port, mess)
-                                if(s.startswith('the-bet')):#Previously, there is someone bet, do you want to follow him
-                                    print("do you want to follow the bet? the bet amount is "+info[len(info)-3])
-                                    print("you have "+info[len(info)-4]+" chip_amount")
-                                    print("your card in hand is "+info[len(info)-5 ])
-                                    bet = input(" y or n: ")
-                                    if(bet == 'y'):
-                                        if(info[len(info)-3] > info[len(info)-4]):# if you do not have enough chip_amounts, and you choose yes, just show hand 
-                                            amount = int(info[len(info)-4])
-                                        else:
-                                            amount = int(info[len(info)-3])
-                                        mess = "bet-start "+amount+" "+roomID+" "+name
-                                        send(ipServer,port, mess)
-                                if(s.startswith('Game end') or s.startswith("Player") or s.startswith("three")):#this is to check whether this round of game is end, or does the player bet or not ,or who is the winner of the game
-                                    '''info = s.split(' ')
-                                    info = info[0:len(info)-2]
-                                    print(" ".join(info))'''
-                                    print(s)
-                                    
-                    elif(s.startswith("fail")):
-                        print("fail to start")
-                        sys.exit()
+        play(incoming_buffer)
                         
     
 else:
@@ -274,5 +266,8 @@ else:
                     if(s.startswith("join")):                   
                         roomID = info[1]
                         print("join successfully and the room ID is "+roomID)
+                if(s.startswith("start")):                   #if received start, means we sucessfully start the game
+                        print("start successfully and the room ID is "+roomID)     
+                        play(incoming_buffer)
 #t3 = threading.Thread(target=start,)
 #t3.start()
